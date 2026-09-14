@@ -121,6 +121,32 @@ class Database:
 
         return await self._run(op)
 
+    async def record_transfer(
+        self,
+        telegram_id: int,
+        *,
+        amount: int,
+        from_account: str,
+        to_account: str,
+        raw_text: str,
+    ) -> dict[str, Any]:
+        def op():
+            result = self.client.rpc(
+                "record_transfer",
+                {
+                    "p_telegram_id": telegram_id,
+                    "p_amount": amount,
+                    "p_from_account": from_account,
+                    "p_to_account": to_account,
+                    "p_raw_text": raw_text,
+                },
+            ).execute()
+            if not result.data:
+                raise RuntimeError("Supabase не вернул результат перевода.")
+            return result.data[0]
+
+        return await self._run(op)
+
     async def undo_last_transaction(self, telegram_id: int) -> dict[str, Any] | None:
         def op():
             result = self.client.rpc(
@@ -142,7 +168,7 @@ class Database:
         def op():
             result = (
                 self.client.table("transactions")
-                .select("id,kind,amount,category,account,raw_text,created_at")
+                .select("id,kind,amount,category,account,target_account,raw_text,created_at")
                 .eq("telegram_id", telegram_id)
                 .gte("created_at", start.isoformat())
                 .lt("created_at", end.isoformat())

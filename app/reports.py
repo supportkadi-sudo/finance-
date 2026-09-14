@@ -46,11 +46,16 @@ def _render(
     incomes = [row for row in rows if row["kind"] == "income"]
     business_out = [row for row in rows if row["kind"] == "business_out"]
     business_in = [row for row in rows if row["kind"] == "business_in"]
+    transfers = [row for row in rows if row["kind"] == "transfer"]
 
     spent = sum(int(row["amount"]) for row in expenses)
     received = sum(int(row["amount"]) for row in incomes)
     sent_to_business = sum(int(row["amount"]) for row in business_out)
     returned_from_business = sum(int(row["amount"]) for row in business_in)
+
+    transfer_totals: dict[str, int] = defaultdict(int)
+    for row in transfers:
+        transfer_totals[row.get("category") or "Перевод"] += int(row["amount"])
 
     by_category: dict[str, int] = defaultdict(int)
     for row in expenses:
@@ -70,6 +75,11 @@ def _render(
             lines.append(f"• В оборот: {money(sent_to_business)}")
         if returned_from_business:
             lines.append(f"• Из оборота: {money(returned_from_business)}")
+
+    if transfer_totals:
+        lines.extend(["", "🔄 Между своими"])
+        for direction, amount in transfer_totals.items():
+            lines.append(f"• {direction}: {money(amount)}")
 
     if by_category:
         lines.extend(["", "Расходы по категориям:"])
