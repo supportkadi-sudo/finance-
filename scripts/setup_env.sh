@@ -8,10 +8,9 @@ read -rsp "Telegram BOT_TOKEN: " BOT_TOKEN
 printf "\n"
 read -rsp "Supabase secret/service-role key: " SUPABASE_SERVICE_ROLE_KEY
 printf "\n"
-read -rp "Telegram owner ID: " OWNER_TELEGRAM_ID
 
-if [[ -z "$BOT_TOKEN" || -z "$SUPABASE_SERVICE_ROLE_KEY" || -z "$OWNER_TELEGRAM_ID" ]]; then
-  echo "Все значения обязательны."
+if [[ -z "$BOT_TOKEN" || -z "$SUPABASE_SERVICE_ROLE_KEY" ]]; then
+  echo "Оба секрета обязательны."
   exit 1
 fi
 
@@ -20,7 +19,7 @@ cat > "$ENV_FILE" <<EOF
 BOT_TOKEN=$BOT_TOKEN
 SUPABASE_URL=https://fmpkliqfbuvucutjljfd.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY
-OWNER_TELEGRAM_ID=$OWNER_TELEGRAM_ID
+OWNER_TELEGRAM_ID=450635496
 TIMEZONE=Asia/Tashkent
 EOF
 
