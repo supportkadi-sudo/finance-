@@ -95,8 +95,80 @@ begin
 end;
 $$;
 
+create or replace function public.undo_last_transaction(
+    p_telegram_id bigint
+)
+returns table (
+    undone_transaction_id uuid,
+    kind text,
+    amount bigint,
+    category text,
+    account text,
+    card_balance bigint,
+    cash_balance bigint
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_user public.users%rowtype;
+    v_tx public.transactions%rowtype;
+    v_reverse_delta bigint;
+begin
+    select *
+      into v_user
+      from public.users
+     where telegram_id = p_telegram_id
+     for update;
+
+    if not found or v_user.initialized_at is null then
+        raise exception 'user is not initialized';
+    end if;
+
+    select *
+      into v_tx
+      from public.transactions
+     where telegram_id = p_telegram_id
+     order by created_at desc, id desc
+     limit 1
+     for update;
+
+    if not found then
+        return;
+    end if;
+
+    v_reverse_delta := case when v_tx.kind = 'income' then -v_tx.amount else v_tx.amount end;
+
+    update public.users
+       set card_balance = card_balance + case when v_tx.account = 'card' then v_reverse_delta else 0 end,
+           cash_balance = cash_balance + case when v_tx.account = 'cash' then v_reverse_delta else 0 end,
+           updated_at = now()
+     where telegram_id = p_telegram_id
+     returning * into v_user;
+
+    delete from public.transactions where id = v_tx.id;
+
+    return query
+    select
+        v_tx.id,
+        v_tx.kind,
+        v_tx.amount,
+        v_tx.category,
+        v_tx.account,
+        v_user.card_balance,
+        v_user.cash_balance;
+end;
+$$;
+
 revoke all on function public.record_transaction(bigint, text, bigint, text, text, text)
 from public, anon, authenticated;
 
+revoke all on function public.undo_last_transaction(bigint)
+from public, anon, authenticated;
+
 grant execute on function public.record_transaction(bigint, text, bigint, text, text, text)
+to service_role;
+
+grant execute on function public.undo_last_transaction(bigint)
 to service_role;
