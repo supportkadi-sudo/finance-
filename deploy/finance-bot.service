@@ -1,0 +1,19 @@
+[Unit]
+Description=Personal Finance Telegram Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=financebot
+Group=financebot
+WorkingDirectory=/opt/finance-bot
+EnvironmentFile=/opt/finance-bot/.env
+ExecStart=/opt/finance-bot/.venv/bin/python -m app.main
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
