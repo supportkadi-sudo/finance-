@@ -184,6 +184,12 @@ async def last(message: Message) -> None:
             sign, category = "↗", "В KADI"
         elif kind == "business_in":
             sign, category = "↙", "Из KADI"
+        elif kind == "transfer":
+            lines.append(
+                f"{created:%d.%m %H:%M} · ↔ {money(int(row['amount']))} · "
+                f"{row.get('category') or 'Перевод'}"
+            )
+            continue
         else:
             sign, category = "−", row.get("category") or "Другое"
         lines.append(
@@ -211,6 +217,8 @@ async def undo_last(message: Message) -> None:
         sign, label = "↗", "В KADI"
     elif result["kind"] == "business_in":
         sign, label = "↙", "Из KADI"
+    elif result["kind"] == "transfer":
+        sign, label = "↔ ", result.get("category") or "Перевод"
     else:
         sign, label = "−", result.get("category") or "Другое"
     card = int(result["card_balance"])
@@ -241,18 +249,40 @@ async def transaction(message: Message) -> None:
             "минус 30к такси наличные\n"
             "+500k карта\n"
             "в KADI 200k карта\n"
-            "из KADI 100k карта"
+            "из KADI 100k карта\n"
+            "с карты в наличные 100k"
         )
         return
 
-    result = await db.record_transaction(
-        message.from_user.id,
-        kind=parsed.kind,
-        amount=parsed.amount,
-        category=parsed.category,
-        account=parsed.account,
-        raw_text=parsed.raw_text,
-    )
+    if parsed.kind == "transfer":
+        if parsed.target_account is None:
+            await message.answer("Не понял направление перевода.")
+            return
+
+        balances = await db.get_balances(message.from_user.id)
+        if balances[parsed.account] < parsed.amount:
+            await message.answer(
+                f"Недостаточно денег: {account_name(parsed.account)} — "
+                f"{money(balances[parsed.account])}."
+            )
+            return
+
+        result = await db.record_transfer(
+            message.from_user.id,
+            amount=parsed.amount,
+            from_account=parsed.account,
+            to_account=parsed.target_account,
+            raw_text=parsed.raw_text,
+        )
+    else:
+        result = await db.record_transaction(
+            message.from_user.id,
+            kind=parsed.kind,
+            amount=parsed.amount,
+            category=parsed.category,
+            account=parsed.account,
+            raw_text=parsed.raw_text,
+        )
 
     now = datetime.now(ZoneInfo(settings.timezone))
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -266,6 +296,11 @@ async def transaction(message: Message) -> None:
         headline = f"↗️ В KADI: {money(parsed.amount)} · {account_name(parsed.account)}"
     elif parsed.kind == "business_in":
         headline = f"↙️ Из KADI: {money(parsed.amount)} · {account_name(parsed.account)}"
+    elif parsed.kind == "transfer":
+        headline = (
+            f"🔄 {account_name(parsed.account)} → "
+            f"{account_name(parsed.target_account or parsed.account)}: {money(parsed.amount)}"
+        )
     else:
         sign = "+" if parsed.kind == "income" else "−"
         label = parsed.category or "Доход"
