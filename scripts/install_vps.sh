@@ -36,8 +36,7 @@ if [[ ! -f "$APP_DIR/.env" ]]; then
   echo
   echo "Сейчас введи BOT_TOKEN и Supabase secret key. Ввод секретов не отображается."
   echo
-  sudo -u "$BOT_USER" "$APP_DIR/scripts/setup_env.sh" <<EOF
-EOF
+  runuser -u "$BOT_USER" -- "$APP_DIR/scripts/setup_env.sh"
 fi
 
 cp "$APP_DIR/deploy/finance-bot.service" "/etc/systemd/system/$SERVICE_NAME.service"
