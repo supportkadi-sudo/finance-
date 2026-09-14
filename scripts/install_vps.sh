@@ -5,7 +5,7 @@ APP_DIR="/opt/finance-bot"
 SERVICE_NAME="finance-bot"
 BOT_USER="financebot"
 REPO_URL="https://github.com/supportkadi-sudo/finance-.git"
-BRANCH="${1:-feat/mvp-finance-bot}"
+BRANCH="${1:-main}"
 
 if [[ "${EUID}" -ne 0 ]]; then
   echo "Запусти через sudo: sudo bash scripts/install_vps.sh"
