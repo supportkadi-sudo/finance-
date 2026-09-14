@@ -63,10 +63,10 @@ begin
         raise exception 'amount must be positive';
     end if;
 
-    select *
+    select u.*
       into v_user
-      from public.users
-     where telegram_id = p_telegram_id
+      from public.users as u
+     where u.telegram_id = p_telegram_id
      for update;
 
     if not found or v_user.initialized_at is null then
@@ -75,20 +75,20 @@ begin
 
     v_delta := case when p_kind = 'income' then p_amount else -p_amount end;
 
-    update public.users
-       set card_balance = card_balance + case when p_account = 'card' then v_delta else 0 end,
-           cash_balance = cash_balance + case when p_account = 'cash' then v_delta else 0 end,
+    update public.users as u
+       set card_balance = u.card_balance + case when p_account = 'card' then v_delta else 0 end,
+           cash_balance = u.cash_balance + case when p_account = 'cash' then v_delta else 0 end,
            updated_at = now()
-     where telegram_id = p_telegram_id
-     returning * into v_user;
+     where u.telegram_id = p_telegram_id
+     returning u.* into v_user;
 
-    insert into public.transactions (
+    insert into public.transactions as t (
         telegram_id, kind, amount, category, account, raw_text
     )
     values (
         p_telegram_id, p_kind, p_amount, p_category, p_account, p_raw_text
     )
-    returning id into v_transaction_id;
+    returning t.id into v_transaction_id;
 
     return query
     select v_transaction_id, v_user.card_balance, v_user.cash_balance;
@@ -116,21 +116,21 @@ declare
     v_tx public.transactions%rowtype;
     v_reverse_delta bigint;
 begin
-    select *
+    select u.*
       into v_user
-      from public.users
-     where telegram_id = p_telegram_id
+      from public.users as u
+     where u.telegram_id = p_telegram_id
      for update;
 
     if not found or v_user.initialized_at is null then
         raise exception 'user is not initialized';
     end if;
 
-    select *
+    select t.*
       into v_tx
-      from public.transactions
-     where telegram_id = p_telegram_id
-     order by created_at desc, id desc
+      from public.transactions as t
+     where t.telegram_id = p_telegram_id
+     order by t.created_at desc, t.id desc
      limit 1
      for update;
 
@@ -140,14 +140,14 @@ begin
 
     v_reverse_delta := case when v_tx.kind = 'income' then -v_tx.amount else v_tx.amount end;
 
-    update public.users
-       set card_balance = card_balance + case when v_tx.account = 'card' then v_reverse_delta else 0 end,
-           cash_balance = cash_balance + case when v_tx.account = 'cash' then v_reverse_delta else 0 end,
+    update public.users as u
+       set card_balance = u.card_balance + case when v_tx.account = 'card' then v_reverse_delta else 0 end,
+           cash_balance = u.cash_balance + case when v_tx.account = 'cash' then v_reverse_delta else 0 end,
            updated_at = now()
-     where telegram_id = p_telegram_id
-     returning * into v_user;
+     where u.telegram_id = p_telegram_id
+     returning u.* into v_user;
 
-    delete from public.transactions where id = v_tx.id;
+    delete from public.transactions as t where t.id = v_tx.id;
 
     return query
     select
