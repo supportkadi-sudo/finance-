@@ -6,7 +6,7 @@ from difflib import SequenceMatcher
 from typing import Literal
 
 
-TransactionKind = Literal["income", "expense", "business_out", "business_in"]
+TransactionKind = Literal["income", "expense", "business_out", "business_in", "transfer"]
 Account = Literal["card", "cash"]
 
 
@@ -15,6 +15,7 @@ class ParsedTransaction:
     kind: TransactionKind
     amount: int
     account: Account
+    target_account: Account | None
     category: str | None
     raw_text: str
 
@@ -30,8 +31,23 @@ AMOUNT_RE = re.compile(
 )
 
 CARD_RE = re.compile(r"\b(карта|карты|карту|карте|картой|card)\b", re.IGNORECASE)
-CASH_RE = re.compile(r"\b(наличные|наличка|налом|нал|кэш|cash)\b", re.IGNORECASE)
+CASH_RE = re.compile(r"\b(наличные|наличка|налички|наличку|налом|нал|кэш|cash)\b", re.IGNORECASE)
 KADI_RE = r"(?:kadi|кади|каде)"
+
+CARD_TO_CASH_PATTERNS = [
+    re.compile(
+        r"\b(?:с|из)?\s*(?:карты|карта|card)\b.*?\b(?:в|на)\s+"
+        r"(?:наличные|наличку|наличка|нал|кэш|cash)\b",
+        re.IGNORECASE,
+    ),
+]
+CASH_TO_CARD_PATTERNS = [
+    re.compile(
+        r"\b(?:с|из)?\s*(?:наличных|налички|наличка|нала|нал|кэша|cash)\b.*?"
+        r"\b(?:в|на)\s+(?:карту|карта|card)\b",
+        re.IGNORECASE,
+    ),
+]
 
 BUSINESS_IN_PATTERNS = [
     re.compile(rf"\b(?:из|с)\s+(?:оборота\s+|оборотки\s+)?{KADI_RE}\b", re.IGNORECASE),
@@ -113,6 +129,17 @@ def parse_amount(text: str, *, allow_small: bool = False) -> tuple[int, tuple[in
         raise ParseError("Слишком маленькая сумма без суффикса. Напиши, например, 15k или 15000.")
 
     return amount, match.span()
+
+
+def _detect_transfer_accounts(text: str) -> tuple[Account, Account] | None:
+    normalized = _normalize(text)
+    for pattern in CARD_TO_CASH_PATTERNS:
+        if pattern.search(normalized):
+            return "card", "cash"
+    for pattern in CASH_TO_CARD_PATTERNS:
+        if pattern.search(normalized):
+            return "cash", "card"
+    return None
 
 
 def _detect_business_kind(text: str) -> TransactionKind | None:
@@ -201,10 +228,24 @@ def parse_transaction(text: str, existing_categories: list[str] | None = None) -
     if not normalized:
         raise ParseError("Пустое сообщение.")
 
-    kind = _detect_kind(normalized)
     amount, amount_span = parse_amount(normalized)
     if amount <= 0:
         raise ParseError("Сумма должна быть больше нуля.")
+
+    transfer_accounts = _detect_transfer_accounts(normalized)
+    if transfer_accounts:
+        source, target = transfer_accounts
+        label = "Карта → Наличные" if source == "card" else "Наличные → Карта"
+        return ParsedTransaction(
+            kind="transfer",
+            amount=amount,
+            account=source,
+            target_account=target,
+            category=label,
+            raw_text=text.strip(),
+        )
+
+    kind = _detect_kind(normalized)
 
     if kind in {"business_out", "business_in"}:
         category = "KADI"
@@ -229,6 +270,7 @@ def parse_transaction(text: str, existing_categories: list[str] | None = None) -
         kind=kind,
         amount=amount,
         account=account,
+        target_account=None,
         category=category,
         raw_text=text.strip(),
     )
