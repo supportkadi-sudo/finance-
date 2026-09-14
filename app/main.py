@@ -187,6 +187,31 @@ async def last(message: Message) -> None:
     await message.answer("\n".join(lines))
 
 
+@router.message(Command("undo"))
+@router.message(F.text.casefold() == "отменить последнюю")
+async def undo_last(message: Message) -> None:
+    if not await _ensure_ready(message):
+        return
+
+    result = await db.undo_last_transaction(message.from_user.id)
+    if not result:
+        await message.answer("Отменять нечего: операций пока нет.")
+        return
+
+    sign = "+" if result["kind"] == "income" else "−"
+    label = result.get("category") or "Доход"
+    card = int(result["card_balance"])
+    cash = int(result["cash_balance"])
+
+    await message.answer(
+        f"↩️ Отменено: {sign}{money(int(result['amount']))} · "
+        f"{label} · {account_name(result['account'])}\n\n"
+        f"Карта: {money(card)}\n"
+        f"Наличные: {money(cash)}\n"
+        f"Всего: {money(card + cash)}"
+    )
+
+
 @router.message(F.text)
 async def transaction(message: Message) -> None:
     if not await _ensure_ready(message):
