@@ -12,6 +12,9 @@ main_keyboard = ReplyKeyboardMarkup(
             KeyboardButton(text="Баланс"),
             KeyboardButton(text="Последние операции"),
         ],
+        [
+            KeyboardButton(text="Отменить последнюю"),
+        ],
     ],
     resize_keyboard=True,
 )
