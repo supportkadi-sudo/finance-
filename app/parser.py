@@ -88,6 +88,8 @@ def parse_amount(text: str, *, allow_small: bool = False) -> tuple[int, tuple[in
         value *= 1_000_000
 
     amount = int(round(value))
+    if amount < 0:
+        raise ParseError("Сумма не может быть отрицательной внутри записи.")
     if amount == 0:
         return 0, match.span()
 
@@ -169,6 +171,8 @@ def parse_transaction(text: str, existing_categories: list[str] | None = None) -
 
     kind = _detect_kind(normalized)
     amount, amount_span = parse_amount(normalized)
+    if amount <= 0:
+        raise ParseError("Сумма должна быть больше нуля.")
 
     known = _known_category(normalized)
     if kind == "income":
