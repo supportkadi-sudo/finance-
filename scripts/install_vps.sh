@@ -17,9 +17,9 @@ if ! id "$BOT_USER" >/dev/null 2>&1; then
 fi
 
 if [[ -d "$APP_DIR/.git" ]]; then
-  git -C "$APP_DIR" fetch origin
-  git -C "$APP_DIR" checkout "$BRANCH"
-  git -C "$APP_DIR" reset --hard "origin/$BRANCH"
+  git -c safe.directory="$APP_DIR" -C "$APP_DIR" fetch origin
+  git -c safe.directory="$APP_DIR" -C "$APP_DIR" checkout "$BRANCH"
+  git -c safe.directory="$APP_DIR" -C "$APP_DIR" reset --hard "origin/$BRANCH"
 else
   rm -rf "$APP_DIR"
   git clone --branch "$BRANCH" --single-branch "$REPO_URL" "$APP_DIR"
