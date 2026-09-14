@@ -12,7 +12,7 @@ create table if not exists public.users (
 create table if not exists public.transactions (
     id uuid primary key default gen_random_uuid(),
     telegram_id bigint not null references public.users(telegram_id) on delete cascade,
-    kind text not null check (kind in ('income', 'expense')),
+    kind text not null check (kind in ('income', 'expense', 'business_out', 'business_in')),
     amount bigint not null check (amount > 0),
     category text,
     account text not null check (account in ('card', 'cash')),
@@ -51,7 +51,7 @@ declare
     v_delta bigint;
     v_transaction_id uuid;
 begin
-    if p_kind not in ('income', 'expense') then
+    if p_kind not in ('income', 'expense', 'business_out', 'business_in') then
         raise exception 'invalid kind';
     end if;
 
@@ -73,7 +73,10 @@ begin
         raise exception 'user is not initialized';
     end if;
 
-    v_delta := case when p_kind = 'income' then p_amount else -p_amount end;
+    v_delta := case
+        when p_kind in ('income', 'business_in') then p_amount
+        else -p_amount
+    end;
 
     update public.users as u
        set card_balance = u.card_balance + case when p_account = 'card' then v_delta else 0 end,
@@ -138,7 +141,10 @@ begin
         return;
     end if;
 
-    v_reverse_delta := case when v_tx.kind = 'income' then -v_tx.amount else v_tx.amount end;
+    v_reverse_delta := case
+        when v_tx.kind in ('income', 'business_in') then -v_tx.amount
+        else v_tx.amount
+    end;
 
     update public.users as u
        set card_balance = u.card_balance + case when v_tx.account = 'card' then v_reverse_delta else 0 end,

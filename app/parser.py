@@ -6,7 +6,7 @@ from difflib import SequenceMatcher
 from typing import Literal
 
 
-TransactionKind = Literal["income", "expense"]
+TransactionKind = Literal["income", "expense", "business_out", "business_in"]
 Account = Literal["card", "cash"]
 
 
@@ -31,10 +31,26 @@ AMOUNT_RE = re.compile(
 
 CARD_RE = re.compile(r"\b(карта|карты|карту|карте|картой|card)\b", re.IGNORECASE)
 CASH_RE = re.compile(r"\b(наличные|наличка|налом|нал|кэш|cash)\b", re.IGNORECASE)
+KADI_RE = r"(?:kadi|кади|каде)"
+
+BUSINESS_IN_PATTERNS = [
+    re.compile(rf"\b(?:из|с)\s+(?:оборота\s+|оборотки\s+)?{KADI_RE}\b", re.IGNORECASE),
+    re.compile(
+        rf"\b(?:забрал|забрала|вывел|вывела|вернул|вернула)\b.*\b{KADI_RE}\b",
+        re.IGNORECASE,
+    ),
+]
+BUSINESS_OUT_PATTERNS = [
+    re.compile(rf"\b(?:в|во)\s+(?:оборот\s+|оборотку\s+)?{KADI_RE}\b", re.IGNORECASE),
+    re.compile(
+        rf"\b(?:вложил|вложила|закинул|закинула|добавил|добавила|перевел|перевела|перевёл)\b.*\b{KADI_RE}\b",
+        re.IGNORECASE,
+    ),
+]
 
 INCOME_WORDS = {
     "плюс", "пришло", "пришли", "получил", "получила", "заработал",
-    "заработала", "доход", "поступило", "закинул", "закинули", "вернули",
+    "заработала", "доход", "прибыль", "поступило", "закинул", "закинули", "вернули",
 }
 EXPENSE_WORDS = {
     "минус", "потратил", "потратила", "потрачено", "купил", "купила",
@@ -99,8 +115,24 @@ def parse_amount(text: str, *, allow_small: bool = False) -> tuple[int, tuple[in
     return amount, match.span()
 
 
+def _detect_business_kind(text: str) -> TransactionKind | None:
+    normalized = _normalize(text)
+    for pattern in BUSINESS_IN_PATTERNS:
+        if pattern.search(normalized):
+            return "business_in"
+    for pattern in BUSINESS_OUT_PATTERNS:
+        if pattern.search(normalized):
+            return "business_out"
+    return None
+
+
 def _detect_kind(text: str) -> TransactionKind:
     normalized = _normalize(text)
+
+    business_kind = _detect_business_kind(normalized)
+    if business_kind:
+        return business_kind
+
     if normalized.startswith("+"):
         return "income"
     if normalized.startswith("-"):
@@ -174,14 +206,17 @@ def parse_transaction(text: str, existing_categories: list[str] | None = None) -
     if amount <= 0:
         raise ParseError("Сумма должна быть больше нуля.")
 
-    known = _known_category(normalized)
-    if kind == "income":
-        category = None
-    elif known:
-        category = known
+    if kind in {"business_out", "business_in"}:
+        category = "KADI"
     else:
-        candidate = _candidate_category(normalized, amount_span)
-        category = _match_existing(candidate, existing_categories or []) or candidate
+        known = _known_category(normalized)
+        if kind == "income":
+            category = None
+        elif known:
+            category = known
+        else:
+            candidate = _candidate_category(normalized, amount_span)
+            category = _match_existing(candidate, existing_categories or []) or candidate
 
     account = _detect_account(normalized)
     if account is None and category == "Кредит":

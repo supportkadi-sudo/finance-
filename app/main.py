@@ -177,8 +177,15 @@ async def last(message: Message) -> None:
     lines = ["🧾 Последние операции", ""]
     for row in rows:
         created = datetime.fromisoformat(row["created_at"].replace("Z", "+00:00")).astimezone(tz)
-        sign = "+" if row["kind"] == "income" else "−"
-        category = row.get("category") or "Доход"
+        kind = row["kind"]
+        if kind == "income":
+            sign, category = "+", "Доход"
+        elif kind == "business_out":
+            sign, category = "↗", "В KADI"
+        elif kind == "business_in":
+            sign, category = "↙", "Из KADI"
+        else:
+            sign, category = "−", row.get("category") or "Другое"
         lines.append(
             f"{created:%d.%m %H:%M} · {sign}{money(int(row['amount']))} · "
             f"{category} · {account_name(row['account'])}"
@@ -198,8 +205,14 @@ async def undo_last(message: Message) -> None:
         await message.answer("Отменять нечего: операций пока нет.")
         return
 
-    sign = "+" if result["kind"] == "income" else "−"
-    label = result.get("category") or "Доход"
+    if result["kind"] == "income":
+        sign, label = "+", "Доход"
+    elif result["kind"] == "business_out":
+        sign, label = "↗", "В KADI"
+    elif result["kind"] == "business_in":
+        sign, label = "↙", "Из KADI"
+    else:
+        sign, label = "−", result.get("category") or "Другое"
     card = int(result["card_balance"])
     cash = int(result["cash_balance"])
 
@@ -226,7 +239,9 @@ async def transaction(message: Message) -> None:
             "Примеры:\n"
             "еда 50k карта\n"
             "минус 30к такси наличные\n"
-            "+500k карта"
+            "+500k карта\n"
+            "в KADI 200k карта\n"
+            "из KADI 100k карта"
         )
         return
 
@@ -244,13 +259,20 @@ async def transaction(message: Message) -> None:
     rows = await db.transactions_between(message.from_user.id, start, now + timedelta(seconds=1))
     spent_today = sum(int(row["amount"]) for row in rows if row["kind"] == "expense")
 
-    sign = "+" if parsed.kind == "income" else "−"
-    label = parsed.category or "Доход"
     card = int(result["card_balance"])
     cash = int(result["cash_balance"])
 
+    if parsed.kind == "business_out":
+        headline = f"↗️ В KADI: {money(parsed.amount)} · {account_name(parsed.account)}"
+    elif parsed.kind == "business_in":
+        headline = f"↙️ Из KADI: {money(parsed.amount)} · {account_name(parsed.account)}"
+    else:
+        sign = "+" if parsed.kind == "income" else "−"
+        label = parsed.category or "Доход"
+        headline = f"✅ {sign}{money(parsed.amount)} · {label} · {account_name(parsed.account)}"
+
     await message.answer(
-        f"✅ {sign}{money(parsed.amount)} · {label} · {account_name(parsed.account)}\n\n"
+        f"{headline}\n\n"
         f"Сегодня потрачено: {money(spent_today)}\n"
         f"Карта: {money(card)}\n"
         f"Наличные: {money(cash)}\n"

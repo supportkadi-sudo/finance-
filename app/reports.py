@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
-from app.db import Database
+if TYPE_CHECKING:
+    from app.db import Database
 
 
 def money(value: int) -> str:
@@ -42,9 +44,13 @@ def _render(
 ) -> str:
     expenses = [row for row in rows if row["kind"] == "expense"]
     incomes = [row for row in rows if row["kind"] == "income"]
+    business_out = [row for row in rows if row["kind"] == "business_out"]
+    business_in = [row for row in rows if row["kind"] == "business_in"]
 
     spent = sum(int(row["amount"]) for row in expenses)
     received = sum(int(row["amount"]) for row in incomes)
+    sent_to_business = sum(int(row["amount"]) for row in business_out)
+    returned_from_business = sum(int(row["amount"]) for row in business_in)
 
     by_category: dict[str, int] = defaultdict(int)
     for row in expenses:
@@ -57,6 +63,13 @@ def _render(
         f"Поступило: {money(received)}",
         f"Операций: {len(rows)}",
     ]
+
+    if sent_to_business or returned_from_business:
+        lines.extend(["", "↔️ KADI"])
+        if sent_to_business:
+            lines.append(f"• В оборот: {money(sent_to_business)}")
+        if returned_from_business:
+            lines.append(f"• Из оборота: {money(returned_from_business)}")
 
     if by_category:
         lines.extend(["", "Расходы по категориям:"])
