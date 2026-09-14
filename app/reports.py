@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
-from app.db import Database
+if TYPE_CHECKING:
+    from app.db import Database
 
 
 def money(value: int) -> str:
