@@ -15,3 +15,17 @@ def test_business_transfers_do_not_count_as_income_or_expense():
     assert "Поступило: 30 000 сум" in text
     assert "В оборот: 200 000 сум" in text
     assert "Из оборота: 100 000 сум" in text
+
+
+def test_internal_transfers_do_not_count_as_income_or_expense():
+    rows = [
+        {"kind": "transfer", "amount": 120_000, "category": "Карта → Наличные"},
+        {"kind": "transfer", "amount": 50_000, "category": "Наличные → Карта"},
+    ]
+
+    text = _render(rows, "Тест")
+
+    assert "Потрачено: 0 сум" in text
+    assert "Поступило: 0 сум" in text
+    assert "Карта → Наличные: 120 000 сум" in text
+    assert "Наличные → Карта: 50 000 сум" in text
