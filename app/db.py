@@ -121,6 +121,18 @@ class Database:
 
         return await self._run(op)
 
+    async def undo_last_transaction(self, telegram_id: int) -> dict[str, Any] | None:
+        def op():
+            result = self.client.rpc(
+                "undo_last_transaction",
+                {"p_telegram_id": telegram_id},
+            ).execute()
+            if not result.data:
+                return None
+            return result.data[0]
+
+        return await self._run(op)
+
     async def transactions_between(
         self,
         telegram_id: int,
