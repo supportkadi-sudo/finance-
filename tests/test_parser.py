@@ -12,8 +12,15 @@ from app.parser import ParseError, parse_transaction
         ("минус 32к яндекс наличные", "expense", 32_000, "cash", "Такси"),
         ("+500k карта", "income", 500_000, "card", None),
         ("пришло 1.5m на карту", "income", 1_500_000, "card", None),
+        ("прибыль KADI 300k карта", "income", 300_000, "card", None),
         ("200k кредит", "expense", 200_000, "card", "Кредит"),
         ("барбер 150000 карта", "expense", 150_000, "card", "Барбер"),
+        ("в KADI 200k карта", "business_out", 200_000, "card", "KADI"),
+        ("в оборот KADI 250k карта", "business_out", 250_000, "card", "KADI"),
+        ("закинул 300k в KADI карта", "business_out", 300_000, "card", "KADI"),
+        ("из KADI 100k карта", "business_in", 100_000, "card", "KADI"),
+        ("из оборота KADI 150k карта", "business_in", 150_000, "card", "KADI"),
+        ("забрал 200k из KADI карта", "business_in", 200_000, "card", "KADI"),
     ],
 )
 def test_parser(text, kind, amount, account, category):
