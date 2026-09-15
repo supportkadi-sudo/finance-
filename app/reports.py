@@ -40,6 +40,7 @@ def _render(
     title: str,
     *,
     show_percentages: bool = False,
+    show_expense_details: bool = False,
     balances: dict[str, int] | None = None,
 ) -> str:
     expenses = [row for row in rows if row["kind"] == "expense"]
@@ -90,6 +91,21 @@ def _render(
             else:
                 lines.append(f"• {category}: {money(amount)}")
 
+            if show_expense_details:
+                category_rows = [
+                    row for row in expenses
+                    if (row.get("category") or "Другое") == category
+                ]
+                for row in category_rows:
+                    raw_text = (row.get("raw_text") or "").strip()
+                    account = account_name(row.get("account") or "card")
+                    if raw_text:
+                        lines.append(f"  ↳ {raw_text} · {account}")
+                    else:
+                        lines.append(
+                            f"  ↳ {money(int(row['amount']))} · {account}"
+                        )
+
     if balances is not None:
         total = balances["card"] + balances["cash"]
         lines.extend(
@@ -116,7 +132,13 @@ async def current_period_report(
     start, end, title = _period_bounds(now, period)
     rows = await db.transactions_between(telegram_id, start, end)
     balances = await db.get_balances(telegram_id)
-    return _render(rows, title, show_percentages=period in {"week", "month"}, balances=balances)
+    return _render(
+        rows,
+        title,
+        show_percentages=period in {"week", "month"},
+        show_expense_details=period == "today",
+        balances=balances,
+    )
 
 
 async def previous_day_report(db: Database, telegram_id: int, timezone: str) -> str:
